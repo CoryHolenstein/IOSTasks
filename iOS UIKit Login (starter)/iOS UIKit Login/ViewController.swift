@@ -155,6 +155,32 @@ extension ViewController {
   }
   
     func presentHomeViewController(with credentials: Credentials) {
+      // Today / Upcoming / All Tasks tabs
+      let todayNav = makeTasksTab(
+        mode: .today,
+        title: "Today",
+        image: "sun.max",
+        selectedImage: "sun.max.fill",
+        tag: 0,
+        credentials: credentials
+      )
+      let upcomingNav = makeTasksTab(
+        mode: .upcoming,
+        title: "Upcoming",
+        image: "calendar",
+        selectedImage: "calendar",
+        tag: 1,
+        credentials: credentials
+      )
+      let allTasksNav = makeTasksTab(
+        mode: .all,
+        title: "All Tasks",
+        image: "checklist",
+        selectedImage: "checklist",
+        tag: 2,
+        credentials: credentials
+      )
+      
       // Settings tab
       let settingsVC = HomeViewController()
       settingsVC.user = self.user
@@ -168,21 +194,46 @@ extension ViewController {
         }
       }
       let settingsNav = UINavigationController(rootViewController: settingsVC)
-      settingsNav.tabBarItem = UITabBarItem(title: "Settings", image: UIImage(systemName: "gear"), tag: 0)
-      
-      // Tasks tab
-      let tasksVC = TasksViewController()
-      tasksVC.user = self.user
-      tasksVC.credentials = credentials
-      let tasksNav = UINavigationController(rootViewController: tasksVC)
-      tasksNav.tabBarItem = UITabBarItem(title: "Tasks", image: UIImage(systemName: "checkmark.circle"), tag: 1)
+      Theme.styleNavigationBar(settingsNav)
+      settingsNav.tabBarItem = UITabBarItem(
+        title: "Settings",
+        image: UIImage(systemName: "gearshape"),
+        selectedImage: UIImage(systemName: "gearshape.fill")
+      )
+      settingsNav.tabBarItem.tag = 3
       
       // Tab bar controller
       let tabBarController = UITabBarController()
-      tabBarController.viewControllers = [tasksNav, settingsNav]
+      tabBarController.viewControllers = [todayNav, upcomingNav, allTasksNav, settingsNav]
+      tabBarController.tabBar.tintColor = Theme.accent
+      tabBarController.view.tintColor = Theme.accent
       tabBarController.modalPresentationStyle = .fullScreen
       
       self.present(tabBarController, animated: true)
+    }
+  
+    private func makeTasksTab(
+      mode: TaskListMode,
+      title: String,
+      image: String,
+      selectedImage: String,
+      tag: Int,
+      credentials: Credentials
+    ) -> UINavigationController {
+      let tasksVC = TasksViewController()
+      tasksVC.mode = mode
+      tasksVC.user = self.user
+      tasksVC.credentials = credentials
+      
+      let nav = UINavigationController(rootViewController: tasksVC)
+      Theme.styleNavigationBar(nav)
+      nav.tabBarItem = UITabBarItem(
+        title: title,
+        image: UIImage(systemName: image),
+        selectedImage: UIImage(systemName: selectedImage)
+      )
+      nav.tabBarItem.tag = tag
+      return nav
     }
 
 }
