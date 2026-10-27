@@ -220,6 +220,9 @@ private struct DatedTask {
 
 class TasksViewController: UIViewController {
   
+  /// API Gateway base URL. Routes: get-all-tasks, create-task, edit-task, delete-task
+  private static let apiBaseURL = "https://r283rocx67.execute-api.us-east-1.amazonaws.com/dev/tasks"
+  
   private let tableView = UITableView(frame: .zero, style: .grouped)
   private let pullToRefresh = UIRefreshControl()
   private let summaryLabel = UILabel()
@@ -476,7 +479,7 @@ class TasksViewController: UIViewController {
       return
     }
     
-    guard let url = URL(string: "https://r283rocx67.execute-api.us-east-1.amazonaws.com/dev/tasks/get-all-tasks") else { return }
+    guard let url = URL(string: "\(TasksViewController.apiBaseURL)/get-all-tasks") else { return }
     
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
@@ -499,7 +502,7 @@ class TasksViewController: UIViewController {
           
           guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200, let data = data else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-            print("❌ Failed to load tasks (Status: \(status))")
+            print("❌ Failed to load tasks (Status: \(status))\(TasksViewController.serverMessage(from: data))")
             return
           }
           
@@ -509,6 +512,9 @@ class TasksViewController: UIViewController {
               self.tasks = tasksArray
               self.hasLoaded = true
               self.reloadList()
+              
+              // Keep reminders in sync with the latest tasks
+              TaskNotifications.shared.sync(with: tasksArray)
             }
           } catch {
             print("❌ Failed to parse tasks: \(error)")
@@ -556,7 +562,7 @@ class TasksViewController: UIViewController {
     guard let userEmail = user?.email else { return }
     guard let credentials = credentials else { return }
     
-    guard let url = URL(string: "https://r283rocx67.execute-api.us-east-1.amazonaws.com/dev/tasks/create") else { return }
+    guard let url = URL(string: "\(TasksViewController.apiBaseURL)/create-task") else { return }
     
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
@@ -581,7 +587,7 @@ class TasksViewController: UIViewController {
               UINotificationFeedbackGenerator().notificationOccurred(.success)
               self.loadTasks()
             } else {
-              self.showError("Failed to create task (Status: \(httpResponse.statusCode))")
+              self.showError("Failed to create task (Status: \(httpResponse.statusCode))\(TasksViewController.serverMessage(from: data))")
             }
           }
         }
@@ -638,7 +644,7 @@ class TasksViewController: UIViewController {
     guard let userEmail = user?.email else { return }
     guard let credentials = credentials else { return }
     
-    guard let url = URL(string: "https://r283rocx67.execute-api.us-east-1.amazonaws.com/dev/tasks/delete-task") else { return }
+    guard let url = URL(string: "\(TasksViewController.apiBaseURL)/delete-task") else { return }
     
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
@@ -666,7 +672,7 @@ class TasksViewController: UIViewController {
               print("✅ Task deleted successfully")
               self.loadTasks()
             } else {
-              self.showError("Failed to delete task (Status: \(httpResponse.statusCode))")
+              self.showError("Failed to delete task (Status: \(httpResponse.statusCode))\(TasksViewController.serverMessage(from: data))")
               self.loadTasks() // Put the task back on screen
             }
           }
@@ -694,9 +700,7 @@ class TasksViewController: UIViewController {
     guard let userEmail = user?.email else { return }
     guard let credentials = credentials else { return }
     
-    // MOCK ENDPOINT: the backend has no update route yet.
-    // Add "/tasks/update-task" to the Lambda + API Gateway to make this work.
-    guard let url = URL(string: "https://r283rocx67.execute-api.us-east-1.amazonaws.com/dev/tasks/update-task") else { return }
+    guard let url = URL(string: "\(TasksViewController.apiBaseURL)/edit-task") else { return }
     
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
@@ -721,7 +725,7 @@ class TasksViewController: UIViewController {
               UINotificationFeedbackGenerator().notificationOccurred(.success)
               self.loadTasks()
             } else {
-              self.showError("Failed to update task (Status: \(httpResponse.statusCode))")
+              self.showError("Failed to update task (Status: \(httpResponse.statusCode))\(TasksViewController.serverMessage(from: data))")
             }
           }
         }
@@ -729,6 +733,23 @@ class TasksViewController: UIViewController {
     } catch {
       showError("Failed to encode request: \(error.localizedDescription)")
     }
+  }
+  
+  /// The reason the server gave for an error, e.g. "\n\nTask not found".
+  /// Reads {"error": "..."} from our Lambda or {"message": "..."} from API Gateway.
+  private static func serverMessage(from data: Data?) -> String {
+    guard let data = data, !data.isEmpty else { return "" }
+    
+    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let message = (json["error"] as? String) ?? (json["message"] as? String) {
+      print("   Server said: \(message)")
+      return "\n\n\(message)"
+    }
+    
+    let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return "" }
+    print("   Server said: \(text)")
+    return "\n\n\(String(text.prefix(200)))"
   }
   
   private func showError(_ message: String) {

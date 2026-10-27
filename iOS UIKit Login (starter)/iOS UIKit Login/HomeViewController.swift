@@ -7,12 +7,14 @@
 
 import UIKit
 import Auth0
+import UserNotifications
 
 
 class HomeViewController: UIViewController {
   
   private enum Row {
     case email
+    case notifications
     case version
     case logOut
   }
@@ -24,6 +26,7 @@ class HomeViewController: UIViewController {
   
   private let sections: [SettingsSection] = [
     SettingsSection(title: "Account", rows: [.email]),
+    SettingsSection(title: "Notifications", rows: [.notifications]),
     SettingsSection(title: "About", rows: [.version]),
     SettingsSection(title: nil, rows: [.logOut]),
   ]
@@ -37,11 +40,54 @@ class HomeViewController: UIViewController {
   var credentials: Credentials?
   var onLogout: (() -> Void)?
   
+  private var notificationStatus: UNAuthorizationStatus?
+  
   override func viewDidLoad() {
     super.viewDidLoad()
     
     setupUI()
     displayUserInfo()
+    
+    // Coming back from the iOS Settings app may have changed the permission
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(refreshNotificationStatus),
+      name: UIApplication.willEnterForegroundNotification,
+      object: nil
+    )
+  }
+  
+  override func viewWillAppear(_ animated: Bool) {
+    super.viewWillAppear(animated)
+    refreshNotificationStatus()
+  }
+  
+  @objc private func refreshNotificationStatus() {
+    TaskNotifications.shared.authorizationStatus { [weak self] status in
+      guard let self = self else { return }
+      self.notificationStatus = status
+      self.tableView.reloadData()
+    }
+  }
+  
+  private var notificationStatusText: String {
+    switch notificationStatus {
+    case .authorized, .provisional, .ephemeral: return "On"
+    case .denied: return "Off"
+    case .notDetermined: return "Turn On"
+    default: return ""
+    }
+  }
+  
+  private func notificationsRowTapped() {
+    if notificationStatus == .notDetermined {
+      TaskNotifications.shared.requestPermission { [weak self] _ in
+        self?.refreshNotificationStatus()
+      }
+    } else if let url = URL(string: UIApplication.openSettingsURLString) {
+      // Permission can only be changed in the iOS Settings app
+      UIApplication.shared.open(url)
+    }
   }
   
   private func setupUI() {
@@ -197,6 +243,7 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
     
     var config = UIListContentConfiguration.valueCell()
     cell.selectionStyle = .none
+    cell.accessoryType = .none
     
     switch row {
     case .email:
@@ -204,6 +251,14 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
       config.secondaryText = user?.email
       config.image = UIImage(systemName: "envelope.fill")
       config.imageProperties.tintColor = Theme.accent
+      
+    case .notifications:
+      config.text = "Reminders"
+      config.secondaryText = notificationStatusText
+      config.image = UIImage(systemName: "bell.badge.fill")
+      config.imageProperties.tintColor = Theme.accent
+      cell.accessoryType = .disclosureIndicator
+      cell.selectionStyle = .default
       
     case .version:
       config.text = "Version"
@@ -227,8 +282,13 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
   func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
     tableView.deselectRow(at: indexPath, animated: true)
     
-    if sections[indexPath.section].rows[indexPath.row] == .logOut {
+    switch sections[indexPath.section].rows[indexPath.row] {
+    case .logOut:
       confirmLogout()
+    case .notifications:
+      notificationsRowTapped()
+    default:
+      break
     }
   }
 }

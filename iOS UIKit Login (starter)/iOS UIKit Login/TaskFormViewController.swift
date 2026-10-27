@@ -185,6 +185,7 @@ struct TaskDraft {
   /// Existing fields: userId, taskId, name, description, dueDate, repeat
   /// New fields:      dueTime ("HH:mm"), importance, recurrence {interval, unit},
   ///                  reminderMinutesBefore, alertStyle
+  /// recurrence and reminderMinutesBefore are null when turned off.
   func payload(userId: String, taskId: String?) -> [String: Any] {
     var payload: [String: Any] = [
       "userId": userId,
@@ -203,11 +204,17 @@ struct TaskDraft {
     if let dueDate = dueDate, hasTime {
       payload["dueTime"] = TaskDates.timeString(dueDate)
     }
+    // Sent as null when turned off, so editing a task clears the old value.
+    // (The backend skips nulls when creating a task.)
     if let recurrence = recurrence {
       payload["recurrence"] = recurrence.dictionary
+    } else {
+      payload["recurrence"] = NSNull()
     }
     if let minutes = reminderMinutesBefore {
       payload["reminderMinutesBefore"] = minutes
+    } else {
+      payload["reminderMinutesBefore"] = NSNull()
     }
     
     return payload

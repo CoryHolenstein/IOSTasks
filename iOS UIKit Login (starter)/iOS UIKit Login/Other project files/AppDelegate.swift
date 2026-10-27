@@ -9,13 +9,16 @@
 
 
 import UIKit
+import UserNotifications
 
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
   func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-    // Override point for customization after application launch.
+    // Task reminders: show them while the app is open, and handle "Snooze".
+    UNUserNotificationCenter.current().delegate = self
+    TaskNotifications.shared.registerCategories()
     return true
   }
 
@@ -33,4 +36,31 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // Use this method to release any resources that were specific to the discarded scenes, as they will not return.
   }
 
+}
+
+
+// MARK: - Notifications
+
+extension AppDelegate: UNUserNotificationCenterDelegate {
+  
+  // Show reminders as banners even while the app is open.
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    completionHandler([.banner, .list, .sound])
+  }
+  
+  // Tapped a reminder or its "Snooze 10 Minutes" button.
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    if response.actionIdentifier == TaskNotifications.snoozeActionIdentifier {
+      TaskNotifications.shared.snooze(response.notification.request.content)
+    }
+    completionHandler()
+  }
 }

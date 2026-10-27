@@ -22,6 +22,7 @@
         E8F3A1E92D420F4700123456 /* HomeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F3A1E82D420F4700123456 /* HomeViewController.swift */; };
         E8F3A1EC2D420F5700123456 /* TasksViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F3A1EB2D420F5700123456 /* TasksViewController.swift */; };
         E8F3A1EF2D420F6700123456 /* TaskFormViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F3A1EE2D420F6700123456 /* TaskFormViewController.swift */; };
+        E8F3A1F12D420F7700123456 /* TaskNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F3A1F02D420F7700123456 /* TaskNotifications.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,6 +40,7 @@
         E8F3A1E82D420F4700123456 /* HomeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewController.swift; sourceTree = "<group>"; };
         E8F3A1EB2D420F5700123456 /* TasksViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TasksViewController.swift; sourceTree = "<group>"; };
         E8F3A1EE2D420F6700123456 /* TaskFormViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskFormViewController.swift; sourceTree = "<group>"; };
+        E8F3A1F02D420F7700123456 /* TaskNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskNotifications.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,6 +80,7 @@
                 E8F3A1E82D420F4700123456 /* HomeViewController.swift */,
                 E8F3A1EB2D420F5700123456 /* TasksViewController.swift */,
                 E8F3A1EE2D420F6700123456 /* TaskFormViewController.swift */,
+                E8F3A1F02D420F7700123456 /* TaskNotifications.swift */,
                 D42890E2284C5F08006AFB73 /* User.swift */,
                 D42890DC284C5CEF006AFB73 /* Info.plist */,
                 D42890E6284C607B006AFB73 /* Auth0.plist */,
@@ -183,6 +186,7 @@
                 E8F3A1E92D420F4700123456 /* HomeViewController.swift in Sources */,
                 E8F3A1EC2D420F5700123456 /* TasksViewController.swift in Sources */,
                 E8F3A1EF2D420F6700123456 /* TaskFormViewController.swift in Sources */,
+                E8F3A1F12D420F7700123456 /* TaskNotifications.swift in Sources */,
                 D42890E5284C5F88006AFB73 /* UIImageView+Extensions.swift in Sources */,
                 D42890D3284C5CED006AFB73 /* ViewController.swift in Sources */,
                 D42890E3284C5F08006AFB73 /* User.swift in Sources */,
