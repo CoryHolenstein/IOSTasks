@@ -220,8 +220,9 @@ private struct DatedTask {
 
 class TasksViewController: UIViewController {
   
-  /// API Gateway base URL. Routes: get-all-tasks, create-task, edit-task, delete-task
-  static let apiBaseURL = "https://r283rocx67.execute-api.us-east-1.amazonaws.com/dev/tasks"
+  /// API Gateway base URL ("prod" stage).
+  /// Routes: get-all-tasks, create-task, edit-task, delete-task, delete-account
+  static let apiBaseURL = "https://r283rocx67.execute-api.us-east-1.amazonaws.com/prod/tasks"
   
   private let tableView = UITableView(frame: .zero, style: .grouped)
   private let pullToRefresh = UIRefreshControl()
