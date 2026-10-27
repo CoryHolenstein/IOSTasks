@@ -28,6 +28,11 @@ class ViewController: UIViewController {
   private var userIsAuthenticated = false
   private var user = User.empty
   
+  /// Identifier of the API created in Auth0 (Applications → APIs).
+  /// Asking for it makes Auth0 issue a signed access token that API Gateway can verify.
+  /// Must exactly match the API's Identifier in Auth0 and the Audience on the JWT authorizer.
+  static let apiAudience = "https://api.taskorganizer.app"
+  
   // Login screen
   private static let appName = "Task Organizer"
   private let backgroundView = GradientBackgroundView()
@@ -314,6 +319,10 @@ extension ViewController {
     
     Auth0
       .webAuth()
+      .audience(ViewController.apiAudience)
+      // Private browser session: no "wants to use auth0.com to sign in" pop-up,
+      // and no cookies left behind, so logging out doesn't need the browser.
+      .useEphemeralSession()
       .start { result in
         DispatchQueue.main.async {
           switch result {

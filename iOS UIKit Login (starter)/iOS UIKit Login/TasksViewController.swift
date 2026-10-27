@@ -221,7 +221,7 @@ private struct DatedTask {
 class TasksViewController: UIViewController {
   
   /// API Gateway base URL. Routes: get-all-tasks, create-task, edit-task, delete-task
-  private static let apiBaseURL = "https://r283rocx67.execute-api.us-east-1.amazonaws.com/dev/tasks"
+  static let apiBaseURL = "https://r283rocx67.execute-api.us-east-1.amazonaws.com/dev/tasks"
   
   private let tableView = UITableView(frame: .zero, style: .grouped)
   private let pullToRefresh = UIRefreshControl()
@@ -735,9 +735,12 @@ class TasksViewController: UIViewController {
     }
   }
   
+  /// Note: the backend ignores the "userId" sent in request bodies and uses the
+  /// signed-in user from the access token instead.
+  ///
   /// The reason the server gave for an error, e.g. "\n\nTask not found".
   /// Reads {"error": "..."} from our Lambda or {"message": "..."} from API Gateway.
-  private static func serverMessage(from data: Data?) -> String {
+  static func serverMessage(from data: Data?) -> String {
     guard let data = data, !data.isEmpty else { return "" }
     
     if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

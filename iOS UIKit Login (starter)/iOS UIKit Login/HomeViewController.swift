@@ -17,11 +17,13 @@ class HomeViewController: UIViewController {
     case notifications
     case version
     case logOut
+    case deleteAccount
   }
   
   private struct SettingsSection {
     let title: String?
     let rows: [Row]
+    var footer: String? = nil
   }
   
   private let sections: [SettingsSection] = [
@@ -29,9 +31,15 @@ class HomeViewController: UIViewController {
     SettingsSection(title: "Notifications", rows: [.notifications]),
     SettingsSection(title: "About", rows: [.version]),
     SettingsSection(title: nil, rows: [.logOut]),
+    SettingsSection(
+      title: nil,
+      rows: [.deleteAccount],
+      footer: "Permanently deletes your account, all of your tasks and their reminders."
+    ),
   ]
   
   private let tableView = UITableView(frame: .zero, style: .insetGrouped)
+  private lazy var busyOverlay = makeBusyOverlay()
   private let avatarImageView = UIImageView()
   private let nameLabel = UILabel()
   private let emailLabel = UILabel()
@@ -176,6 +184,118 @@ class HomeViewController: UIViewController {
     return "\(version) (\(build))"
   }
   
+  // MARK: Delete account
+  // ====================
+  
+  private func confirmDeleteAccount() {
+    let alert = UIAlertController(
+      title: "Delete Account?",
+      message: "This permanently deletes your account and all of your tasks and reminders. This can’t be undone.",
+      preferredStyle: .alert
+    )
+    alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+    alert.addAction(UIAlertAction(title: "Delete Account", style: .destructive) { _ in
+      self.deleteAccount()
+    })
+    present(alert, animated: true)
+  }
+  
+  private func deleteAccount() {
+    guard let credentials = credentials,
+          let url = URL(string: "\(TasksViewController.apiBaseURL)/delete-account")
+    else { return }
+    
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("Bearer \(credentials.accessToken)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = Data("{}".utf8) // the server deletes whoever is signed in
+    request.timeoutInterval = 30
+    
+    setBusy(true)
+    
+    URLSession.shared.dataTask(with: request) { data, response, error in
+      DispatchQueue.main.async {
+        self.setBusy(false)
+        
+        if let error = error {
+          self.showMessage(title: "Couldn’t Delete Account", message: error.localizedDescription)
+          return
+        }
+        
+        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        guard status == 200 else {
+          let detail = TasksViewController.serverMessage(from: data)
+          self.showMessage(title: "Couldn’t Delete Account", message: "Something went wrong (Status: \(status)).\(detail)")
+          return
+        }
+        
+        print("✅ Account deleted")
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        TaskNotifications.shared.removeAll()
+        
+        let done = UIAlertController(
+          title: "Account Deleted",
+          message: "Your account and all of your tasks have been deleted.",
+          preferredStyle: .alert
+        )
+        done.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+          self.signOutAfterDeletion()
+        })
+        self.present(done, animated: true)
+      }
+    }.resume()
+  }
+  
+  /// The account no longer exists, so just return to the login screen.
+  private func signOutAfterDeletion() {
+    logOut()
+  }
+  
+  private func showMessage(title: String, message: String) {
+    let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+    alert.addAction(UIAlertAction(title: "OK", style: .default))
+    present(alert, animated: true)
+  }
+  
+  /// Dims the screen with a spinner while the account is being deleted.
+  private func setBusy(_ busy: Bool) {
+    let host: UIView = tabBarController?.view ?? view
+    if busy {
+      busyOverlay.frame = host.bounds
+      host.addSubview(busyOverlay)
+    } else {
+      busyOverlay.removeFromSuperview()
+    }
+  }
+  
+  private func makeBusyOverlay() -> UIView {
+    let overlay = UIView()
+    overlay.backgroundColor = UIColor.black.withAlphaComponent(0.35)
+    overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    
+    let spinner = UIActivityIndicatorView(style: .large)
+    spinner.color = .white
+    spinner.startAnimating()
+    
+    let label = UILabel()
+    label.text = "Deleting account…"
+    label.font = Theme.roundedFont(size: 17, weight: .semibold)
+    label.textColor = .white
+    
+    let stack = UIStackView(arrangedSubviews: [spinner, label])
+    stack.axis = .vertical
+    stack.spacing = 12
+    stack.alignment = .center
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    overlay.addSubview(stack)
+    NSLayoutConstraint.activate([
+      stack.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+      stack.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
+    ])
+    return overlay
+  }
+  
   // MARK: Log out
   // =============
   
@@ -192,31 +312,12 @@ class HomeViewController: UIViewController {
     present(alert, animated: true)
   }
   
+  /// Logins use a private browser session that saves no cookies, so logging
+  /// out only needs to forget the user on this phone. No browser pop-up needed.
   private func logOut() {
-    Auth0
-      .webAuth()
-      .logout(federated: true) { result in
-        switch result {
-        case .failure(let error):
-          print("Logout failed: \(error)")
-          DispatchQueue.main.async {
-            let alert = UIAlertController(
-              title: "Logout Failed",
-              message: error.localizedDescription,
-              preferredStyle: .alert
-            )
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
-            self.present(alert, animated: true)
-          }
-          
-        case .success():
-          print("Logged out successfully")
-          DispatchQueue.main.async {
-            self.onLogout?()
-            self.dismiss(animated: true)
-          }
-        }
-      }
+    print("Logged out")
+    onLogout?()
+    dismiss(animated: true)
   }
 }
 
@@ -235,6 +336,10 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
   
   func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
     return sections[section].title
+  }
+  
+  func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
+    return sections[section].footer
   }
   
   func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -273,6 +378,13 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
       config.textProperties.font = .systemFont(ofSize: 17, weight: .semibold)
       config.textProperties.alignment = .center
       cell.selectionStyle = .default
+      
+    case .deleteAccount:
+      config = UIListContentConfiguration.cell()
+      config.text = "Delete Account"
+      config.textProperties.color = .systemRed
+      config.textProperties.alignment = .center
+      cell.selectionStyle = .default
     }
     
     cell.contentConfiguration = config
@@ -287,6 +399,8 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
       confirmLogout()
     case .notifications:
       notificationsRowTapped()
+    case .deleteAccount:
+      confirmDeleteAccount()
     default:
       break
     }

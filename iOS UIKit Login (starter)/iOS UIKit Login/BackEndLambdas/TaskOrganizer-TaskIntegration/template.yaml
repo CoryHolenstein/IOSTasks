@@ -34,7 +34,7 @@ Resources:
       SnapStart:
         ApplyOn: None
       Tags: {}
-      Timeout: 3
+      Timeout: 15
       Tracing: PassThrough
       Events:
         Trigger1Event:
@@ -57,3 +57,8 @@ Resources:
           Properties:
             Method: ANY
             Path: /tasks/edit-task
+        Trigger5Event:
+          Type: HttpApi
+          Properties:
+            Method: ANY
+            Path: /tasks/delete-account
