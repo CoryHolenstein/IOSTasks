@@ -40,6 +40,7 @@ class ViewController: UIViewController {
   private let bottomStack = UIStackView()
   private let continueButton = UIButton(type: .system)
   private var didAnimateIn = false
+  private var didTryRestoringSession = false
   
   override var preferredStatusBarStyle: UIStatusBarStyle {
     return .lightContent
@@ -65,7 +66,23 @@ extension ViewController {
   
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
-    animateInIfNeeded()
+    
+    // On launch, skip the login screen if a saved login can be restored.
+    guard !didTryRestoringSession else {
+      animateInIfNeeded()
+      return
+    }
+    didTryRestoringSession = true
+    
+    LoginSession.shared.restore { [weak self] credentials in
+      guard let self = self else { return }
+      if let credentials = credentials {
+        print("🔑 Restored saved login")
+        self.signIn(with: credentials, animated: false)
+      } else {
+        self.animateInIfNeeded()
+      }
+    }
   }
   
   
@@ -323,6 +340,8 @@ extension ViewController {
       // Private browser session: no "wants to use auth0.com to sign in" pop-up,
       // and no cookies left behind, so logging out doesn't need the browser.
       .useEphemeralSession()
+      // offline_access asks Auth0 for a refresh token, used to stay logged in
+      .scope("openid profile email offline_access")
       .start { result in
         DispatchQueue.main.async {
           switch result {
@@ -345,16 +364,22 @@ extension ViewController {
             self.present(alert, animated: true)
             
           case .success(let credentials):
-            self.userIsAuthenticated = true
-            self.user = User.from(credentials.idToken)
-            self.presentHomeViewController(with: credentials)
-            self.setLoading(false)
+            LoginSession.shared.save(credentials)
+            self.signIn(with: credentials, animated: true)
           }
         }
       }
   }
   
-    func presentHomeViewController(with credentials: Credentials) {
+    /// Shows the app for a logged-in user.
+    private func signIn(with credentials: Credentials, animated: Bool) {
+      userIsAuthenticated = true
+      user = User.from(credentials.idToken)
+      presentHomeViewController(with: credentials, animated: animated)
+      setLoading(false)
+    }
+  
+    func presentHomeViewController(with credentials: Credentials, animated: Bool = true) {
       // Today / Upcoming / All Tasks tabs
       let todayNav = makeTasksTab(
         mode: .today,
@@ -389,6 +414,7 @@ extension ViewController {
         self?.userIsAuthenticated = false
         self?.user = User.empty
         TaskNotifications.shared.removeAll() // don't remind the next person who logs in
+        LoginSession.shared.clear()               // forget the saved login
         DispatchQueue.main.async {
           self?.setLoading(false)
         }
@@ -409,7 +435,7 @@ extension ViewController {
       tabBarController.view.tintColor = Theme.accent
       tabBarController.modalPresentationStyle = .fullScreen
       
-      self.present(tabBarController, animated: true)
+      self.present(tabBarController, animated: animated)
     }
   
     private func makeTasksTab(
@@ -436,6 +462,55 @@ extension ViewController {
       return nav
     }
 
+}
+
+// MARK: - Saved login
+// ===================
+
+/// Keeps the user logged in between launches.
+///
+/// Auth0's CredentialsManager stores the login in the iPhone's Keychain and,
+/// when the access token expires, quietly gets a new one with the refresh token.
+/// Requires the "offline_access" scope at login, and "Allow Offline Access"
+/// turned on for the API in the Auth0 dashboard.
+final class LoginSession {
+  
+  static let shared = LoginSession()
+  
+  private let credentialsManager = CredentialsManager(authentication: Auth0.authentication())
+  
+  private init() {}
+  
+  func save(_ credentials: Credentials) {
+    // `try?` + `_ =` works whether this SDK version throws or returns a Bool.
+    _ = try? credentialsManager.store(credentials: credentials)
+  }
+  
+  func clear() {
+    _ = try? credentialsManager.clear()
+  }
+  
+  /// The saved login, renewed if it has expired. Nil if there isn't one,
+  /// or it can no longer be renewed (then the user logs in again).
+  func restore(completion: @escaping (Credentials?) -> Void) {
+    credentials(completion: completion)
+  }
+  
+  /// Valid credentials for an API call, renewed first if they've expired.
+  /// Delivered on the main thread.
+  func credentials(completion: @escaping (Credentials?) -> Void) {
+    credentialsManager.credentials { result in
+      DispatchQueue.main.async {
+        switch result {
+        case .success(let credentials):
+          completion(credentials)
+        case .failure(let error):
+          print("🔑 No usable saved login: \(error)")
+          completion(nil)
+        }
+      }
+    }
+  }
 }
 
 // MARK: - Login background

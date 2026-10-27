@@ -201,9 +201,25 @@ class HomeViewController: UIViewController {
   }
   
   private func deleteAccount() {
-    guard let credentials = credentials,
-          let url = URL(string: "\(TasksViewController.apiBaseURL)/delete-account")
-    else { return }
+    setBusy(true)
+    
+    // Use a fresh access token (renewed if it has expired)
+    LoginSession.shared.credentials { [weak self] fresh in
+      guard let self = self else { return }
+      guard let credentials = fresh ?? self.credentials else {
+        self.setBusy(false)
+        return
+      }
+      self.credentials = credentials
+      self.sendDeleteAccount(using: credentials)
+    }
+  }
+  
+  private func sendDeleteAccount(using credentials: Credentials) {
+    guard let url = URL(string: "\(TasksViewController.apiBaseURL)/delete-account") else {
+      setBusy(false)
+      return
+    }
     
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
@@ -211,8 +227,6 @@ class HomeViewController: UIViewController {
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     request.httpBody = Data("{}".utf8) // the server deletes whoever is signed in
     request.timeoutInterval = 30
-    
-    setBusy(true)
     
     URLSession.shared.dataTask(with: request) { data, response, error in
       DispatchQueue.main.async {

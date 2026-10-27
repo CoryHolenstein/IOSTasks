@@ -468,7 +468,24 @@ class TasksViewController: UIViewController {
   // MARK: Load
   // ==========
   
+  /// Runs `send` once a fresh access token is available, renewing an expired one first.
+  private func withFreshCredentials(_ send: @escaping () -> Void) {
+    LoginSession.shared.credentials { [weak self] fresh in
+      guard let self = self else { return }
+      if let fresh = fresh {
+        self.credentials = fresh
+      }
+      send() // falls back to the current credentials if renewing failed
+    }
+  }
+  
   private func loadTasks() {
+    withFreshCredentials { [weak self] in
+      self?.performLoadTasks()
+    }
+  }
+  
+  private func performLoadTasks() {
     guard let userEmail = user?.email else {
       pullToRefresh.endRefreshing()
       return
@@ -559,6 +576,12 @@ class TasksViewController: UIViewController {
   }
   
   private func createTask(draft: TaskDraft) {
+    withFreshCredentials { [weak self] in
+      self?.performCreateTask(draft: draft)
+    }
+  }
+  
+  private func performCreateTask(draft: TaskDraft) {
     guard let userEmail = user?.email else { return }
     guard let credentials = credentials else { return }
     
@@ -641,6 +664,12 @@ class TasksViewController: UIViewController {
   }
   
   private func deleteTask(taskId: String) {
+    withFreshCredentials { [weak self] in
+      self?.performDeleteTask(taskId: taskId)
+    }
+  }
+  
+  private func performDeleteTask(taskId: String) {
     guard let userEmail = user?.email else { return }
     guard let credentials = credentials else { return }
     
@@ -697,6 +726,12 @@ class TasksViewController: UIViewController {
   }
   
   private func updateTask(taskId: String, draft: TaskDraft) {
+    withFreshCredentials { [weak self] in
+      self?.performUpdateTask(taskId: taskId, draft: draft)
+    }
+  }
+  
+  private func performUpdateTask(taskId: String, draft: TaskDraft) {
     guard let userEmail = user?.email else { return }
     guard let credentials = credentials else { return }
     
